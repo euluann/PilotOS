@@ -1,33 +1,50 @@
 // encoding: utf-8
-// Copyright (c) 2026 Luan Pestana, Miguel Sampaio
+// Copyright (c) 2026 Luan Pestana e Miguel Sampaio
 // SPDX-License-Identifier: MIT
-.global _start
-.extern kernel_main
-.extern __bss_start
-.extern __bss_end
 
-.section .text
+#include "stdlib.h"
+#include "libfoda.h"
 
-_start:
-    mov $stack_top, %rsp
+// ATENCAO //
+// O kernel.c DEVE comecar pela funcao main, ou o bootloader ira falhar
 
-    xor %eax, %eax // Zera EAX (importante pois o rep seguinte copia seu valor)
-    mov $__bss_start, %rdi // Poe em RDI o endereco inicial de .bss
-    mov $__bss_end, %rcx // Poe em RDI o endereco final de .bss   
-    sub %rdi, %rcx // Subtrai o endereco final com o inicial para saber quantos bytes ha em .bss
-    shr $2, %rcx // Right Shift, desloca 2 bits para direita em rcx, equivalente a dividir por 4
-    rep stosl // Escreve os 4 bytes presentes em EAX repetidamente por todo o .bss, zerando o mesmo
+ // Pre declara funcoes e variaveis declaradas apos o main, ou nao sera possivel usa-las no main, mas NAO crie uma funcao antes do main
+void main_process(void);
 
-    call kernel_main // Chama a funcao main do kernel
+void kernel_main(void){
+    idt_init(); // ESSA MERDA TEM QUE INICIAR ANTES DE ABSOLUTAMENTE TUDO!!!!!!!!!!!!!! 
+    pic_remap(); // ESSA TBM TEM QUE!!!!!!!!!!!!
 
-.hang:
-    hlt
-    jmp .hang
+    // Etapas de verificacao do kernel, como detectar a CPU, inicializar o PIT e calibrar o TSC (MUITO IMPORTANTE, SEM ISSO O KERNEL NAO FUNCIONA)
+    cpu_detect();
 
-.section .bss
-.align 16
+    if (!cpu.has_tsc) {
+        print("Sem TSC; usando somente o PIT\n");
+        cpu.tsc_hz = 0;
+    } else if (!cpu.tsc_invariant) {
+        print("TSC nao invariante; usando somente o PIT\n");
+        cpu.tsc_hz = 0;
+    } else {
+        print("TSC invariante\n");
+        cpu.tsc_hz = calibrate_tsc_hz();
+    }
 
-stack_bottom:
-    .skip 16384
+    // Criacao de um processo idle pro kernel, que vai rodar quando nao houver nenhum outro processo pronto e o codigo nao quebrar se nao houber nenhum processo pronto
+    create_process(0, hlt, PRIORITY_MAX);
+    create_process(1, main_process, 0);
 
-stack_top:
+    current = &proc_table[0];
+    current->state = PROC_RUNNING;
+
+    pit_init(HZ);
+    enable_interrupts(); 
+
+    hlt();
+}
+
+// Esse e o processo que inicia junto do kernel_main, entao todo o codigo base do kernel é escrito aqui
+void main_process(void){
+    clear();
+    sleep(10000);
+    print("Bom dia manos");
+}
