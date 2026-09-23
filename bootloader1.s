@@ -33,7 +33,7 @@ _start:
 
     // Lendo a MBR //
     mov $0x02, %ah // AH eh usado para a BIOS saber qual operacao eh a desejada. Ler setores
-    mov $0x01, %al // Ler 1 setor
+    mov $0x10, %al // Ler 1 setor
     mov $0x00, %ch // Cilindro 0
     mov $0x01, %cl // Setor 1
     mov $0x00, %dh // Head 0 (cabeca de leitura)
