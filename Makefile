@@ -11,6 +11,9 @@ KERNEL_SIZE = $(BUILD)/kernel_size.inc
 BOOTLOADER_OBJ = $(BUILD)/bootloader.o
 BOOTLOADER_BIN = $(BUILD)/bootloader.bin
 
+BOOTLOADER2_OBJ = $(BUILD)/bootloader2.o
+BOOTLOADER2_BIN = $(BUILD)/bootloader2.bin
+
 IMG = $(BUILD)/MyOS.img
 ISO = $(BUILD)/MyOS.iso
 
@@ -68,9 +71,9 @@ $(BUILD)/kernel.o: kernel.c stdlib.h libfoda.h | $(BUILD)
 		-c kernel.c \
 		-o $@
 
-$(BUILD)/context_switch.o: context_switch.S | $(BUILD)
+$(BUILD)/context_switch.o: context_switch.s | $(BUILD)
 	$(CC) --target=x86_64-unknown-none \
-		-c context_switch.S \
+		-c context_switch.s \
 		-o $@
 
 $(KERNEL_ELF): $(BUILD)/boot.o $(BUILD)/kernel.o $(BUILD)/stdlib.o $(BUILD)/context_switch.o $(BUILD)/idt.o $(BUILD)/isr_stubs.o $(BUILD)/libfoda.o linker.ld
@@ -117,32 +120,37 @@ $(BOOTLOADER_BIN): $(BOOTLOADER_OBJ)
 		-o $@ \
 		$(BOOTLOADER_OBJ)
 
+$(BOOTLOADER2_OBJ): bootloader2.S $(KERNEL_SIZE) | $(BUILD)
+	$(CC) --target=i386-unknown-none \
+		-m16 \
+		-I$(BUILD) \
+		-c bootloader2.S \
+		-o $@
+
+$(BOOTLOADER2_BIN): $(BOOTLOADER2_OBJ)
+	$(LD) -m elf_i386 \
+		--image-base 0x8000 \
+		--oformat binary \
+		-Ttext 0x8000 \
+		-o $@ \
+		$(BOOTLOADER2_OBJ)
 
 # ============================================================
 # DISK IMAGE
 # ============================================================
 
-$(IMG): $(BOOTLOADER_BIN) $(KERNEL_BIN)
+$(IMG): $(BOOTLOADER_BIN) $(BOOTLOADER2_BIN) $(KERNEL_BIN)
 	@echo "Criando imagem de disco..."
+	dd if=/dev/zero of=$(IMG) bs=512 count=2880
 
-	dd if=/dev/zero \
-		of=$(IMG) \
-		bs=512 \
-		count=2880
+	@echo "Gravando bootloader1..."
+	dd if=$(BOOTLOADER_BIN) of=$(IMG) conv=notrunc
 
-	@echo "Gravando bootloader..."
-
-	dd if=$(BOOTLOADER_BIN) \
-		of=$(IMG) \
-		conv=notrunc
+	@echo "Gravando bootloader2..."
+	dd if=$(BOOTLOADER2_BIN) of=$(IMG) bs=512 seek=1 conv=notrunc
 
 	@echo "Gravando kernel..."
-
-	dd if=$(KERNEL_BIN) \
-		of=$(IMG) \
-		bs=512 \
-		seek=1 \
-		conv=notrunc
+	dd if=$(KERNEL_BIN) of=$(IMG) bs=512 seek=2 conv=notrunc
 
 	@echo "Imagem criada: $(IMG)"
 
@@ -186,11 +194,9 @@ $(ISO): $(IMG)
 # RUN
 # ============================================================
 
-run: $(ISO)
+run: $(IMG)
 	qemu-system-x86_64 \
-		-cdrom $(ISO) \
-		-cpu host \
-		-enable-kvm \
+		-drive file=$(IMG),format=raw,if=ide \
 		-d int,cpu_reset \
 		-no-reboot \
 		-no-shutdown \

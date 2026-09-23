@@ -45,6 +45,17 @@ void kernel_main(void){
 // Esse e o processo que inicia junto do kernel_main, entao todo o codigo base do kernel é escrito aqui
 void main_process(void){
     clear();
-    sleep(10000);
-    print("Bom dia manos");
+    print("1");
+    sleep(1000);
+    cursor--;
+    
+    print("2");
+    sleep(1000);
+    cursor--;
+    
+    print("3");
+    sleep(1000);
+    cursor--;
+
+    print(" O kernel ta funcionando e o sleep tbm!!!!!!!");
 }
