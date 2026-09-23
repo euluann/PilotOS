@@ -101,11 +101,11 @@ $(KERNEL_SIZE): $(KERNEL_BIN)
 # BOOTLOADER
 # ============================================================
 
-$(BOOTLOADER_OBJ): bootloader.S $(KERNEL_SIZE) | $(BUILD)
+$(BOOTLOADER_OBJ): bootloader1.S $(KERNEL_SIZE) | $(BUILD)
 	$(CC) --target=i386-unknown-none \
 		-m16 \
 		-I$(BUILD) \
-		-c bootloader.S \
+		-c bootloader1.S \
 		-o $@
 
 
